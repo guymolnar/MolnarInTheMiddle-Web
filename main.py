@@ -1,7 +1,7 @@
 from scapy.all import *
 from spoofer import *
 from sniffer import *
-from app import run as run_flask
+from app import run as run_flask, set_devices
 import threading
 import time
 
@@ -15,7 +15,7 @@ gateway_ip = "192.168.10.1"
 ip_to_mac = {}
 devices = {
     "28:d0:43:c7:bf:6c": {"name": "Guy", "device": "Laptop", "ip" : "192.168.10.133"},
-    #"72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
+    "72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
 }
 
 
@@ -72,6 +72,11 @@ def main():
     print(f"Gateway MAC: {gateway_mac}")
 
     try:
+        set_devices(devices)
+        flask_thread = threading.Thread(target=run_flask)
+        flask_thread.daemon = True
+        flask_thread.start()
+
         forwarding_thread = threading.Thread(target=start_forwarding, args=(devices, ip_to_mac, gateway_mac, my_mac, blacklisted))
         forwarding_thread.daemon = True
         forwarding_thread.start()

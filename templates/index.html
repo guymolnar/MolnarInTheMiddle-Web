@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MITM Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:      #010104;
+            --panel:   #03030a;
+            --surface: #06060f;
+            --border:  #0d0d1f;
+            --border2: #141430;
+            --text:    #b8ffc8;
+            --dim:     #2a6040;
+            --muted:   #1e4030;
+            --muted2:  #3a7055;
+            --cyan:    #00ffe5;
+            --green:   #00ff88;
+            --green2:  #00cc66;
+            --pink:    #ff2d6e;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            overflow: hidden;
+            cursor: default;
+        }
+
+        /* CRT scanlines */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(0, 255, 100, 0.015) 3px,
+                rgba(0, 255, 100, 0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* green phosphor glow behind everything */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -300px;
+            right: -300px;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(0,255,136,0.04) 0%, transparent 65%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .shell {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── topbar ───────────────────────────────────── */
+        .topbar {
+            height: 52px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 18px;
+            border-bottom: 1px solid var(--border2);
+            background: var(--panel);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .topbar::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%; height: 1px;
+            background: linear-gradient(90deg, var(--green) 0%, var(--cyan) 30%, transparent 70%);
+            opacity: 0.5;
+        }
+
+        .logo {
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: var(--green);
+            text-shadow: 0 0 20px rgba(0,255,136,0.6), 0 0 40px rgba(0,255,136,0.2);
+            text-transform: uppercase;
+        }
+
+        .logo-slash {
+            color: var(--cyan);
+            text-shadow: 0 0 20px rgba(0,255,229,0.6);
+            margin: 0 4px;
+        }
+
+        .vdiv {
+            width: 1px;
+            height: 20px;
+            background: var(--border2);
+        }
+
+        .topbar-tag {
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--muted2);
+        }
+
+        .spacer { flex: 1; }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+        }
+
+        .tstat-label {
+            font-size: 9px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted2);
+        }
+
+        .tstat-val {
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--cyan);
+            text-shadow: 0 0 12px rgba(0,255,229,0.5);
+            line-height: 1;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px;
+            border: 1px solid var(--green2);
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--green);
+            text-transform: uppercase;
+            text-shadow: 0 0 8px rgba(0,255,136,0.5);
+            box-shadow: 0 0 12px rgba(0,255,136,0.08), inset 0 0 12px rgba(0,255,136,0.04);
+        }
+
+        .blink-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0; }
+        }
+
+        /* ── body ─────────────────────────────────────── */
+        .body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── sidebar ──────────────────────────────────── */
+        .sidebar {
+            width: 230px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border2);
+            background: var(--panel);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 1px; height: 100%;
+            background: linear-gradient(180deg, var(--green2) 0%, transparent 60%);
+            opacity: 0.3;
+        }
+
+        .sidebar-hdr {
+            padding: 12px 16px 10px;
+            font-size: 9px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--muted2);
+            border-bottom: 1px solid var(--border2);
+            flex-shrink: 0;
+        }
+
+        .sidebar-hdr::before {
+            content: '// ';
+            color: var(--green2);
+            opacity: 0.6;
+        }
+
+        .device-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .device-list::-webkit-scrollbar { width: 2px; }
+        .device-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+        .dcard {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            border-left: 2px solid transparent;
+            cursor: pointer;
+            transition: background 0.1s, border-color 0.1s;
+        }
+
+        .dcard:hover  { background: var(--surface); }
+        .dcard.active { background: var(--surface); }
+
+        .dcard-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 2px;
+        }
+
+        .dcard-name {
+            font-size: 13px;
+            font-weight: 600;
+            text-shadow: 0 0 8px currentColor;
+        }
+
+        .dcard-count {
+            font-size: 11px;
+            color: var(--muted2);
+        }
+
+        .dcard-device {
+            font-size: 10px;
+            color: var(--muted2);
+            letter-spacing: 1px;
+            margin-bottom: 7px;
+            text-transform: uppercase;
+        }
+
+        .dcard-last {
+            font-size: 10px;
+            color: var(--muted2);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dcard-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+            margin-top: 8px;
+        }
+
+        .dbar {
+            flex: 1;
+            min-height: 1px;
+            transition: height 0.35s ease;
+        }
+
+        .sidebar-footer {
+            padding: 11px 16px;
+            border-top: 1px solid var(--border2);
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted2);
+            cursor: pointer;
+            transition: color 0.1s;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer:hover { color: var(--text); }
+        .sidebar-footer.active { color: var(--green); text-shadow: 0 0 8px rgba(0,255,136,0.5); }
+
+        /* ── main feed ────────────────────────────────── */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .feed-hdr {
+            display: grid;
+            grid-template-columns: 72px 1fr 175px;
+            padding: 10px 24px;
+            font-size: 9px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--muted2);
+            border-bottom: 1px solid var(--border2);
+            background: var(--panel);
+            flex-shrink: 0;
+        }
+
+        .feed {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .feed::-webkit-scrollbar { width: 2px; }
+        .feed::-webkit-scrollbar-thumb { background: var(--border2); }
+
+        .row {
+            display: grid;
+            grid-template-columns: 72px 1fr 175px;
+            padding: 8px 24px;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            animation: rowIn 0.2s ease;
+            transition: background 0.08s;
+        }
+
+        .row:hover  { background: var(--surface); }
+        .row.hidden { display: none; }
+
+        @keyframes rowIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .row-time {
+            font-size: 10px;
+            color: var(--muted2);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 1px;
+        }
+
+        .row-domain {
+            font-size: 12px;
+            color: var(--text);
+            letter-spacing: 0.5px;
+        }
+
+        .row-who {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            justify-content: flex-end;
+        }
+
+        .row-who-info { text-align: right; }
+
+        .row-who-name {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.3;
+            text-shadow: 0 0 8px currentColor;
+        }
+
+        .row-who-device {
+            font-size: 10px;
+            color: var(--muted2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            line-height: 1.3;
+        }
+
+        .row-pip {
+            width: 6px;
+            height: 6px;
+            flex-shrink: 0;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            height: 240px;
+            color: var(--muted2);
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .empty-glyph {
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            color: var(--green2);
+            opacity: 0.2;
+            text-shadow: 0 0 20px var(--green);
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <div class="topbar">
+        <div class="logo">MITM<span class="logo-slash">/</span>SUITE</div>
+        <div class="vdiv"></div>
+        <div class="topbar-tag">Intercept Active</div>
+        <div class="spacer"></div>
+        <div class="topbar-right">
+            <div>
+                <div class="tstat-label">Captured</div>
+                <div class="tstat-val" id="total-count">0</div>
+            </div>
+            <div>
+                <div class="tstat-label">Targets</div>
+                <div class="tstat-val" id="target-count">0</div>
+            </div>
+            <div class="live-badge">
+                <div class="blink-dot"></div>
+                Live
+            </div>
+        </div>
+    </div>
+
+    <div class="body">
+        <aside class="sidebar">
+            <div class="sidebar-hdr">Targets</div>
+            <div class="device-list" id="device-list"></div>
+            <div class="sidebar-footer active" id="all-btn" onclick="setFilter(null)">
+                &gt; All Devices
+            </div>
+        </aside>
+
+        <div class="main">
+            <div class="feed-hdr">
+                <span>Time</span>
+                <span>Domain</span>
+                <span style="text-align:right">Target</span>
+            </div>
+            <div class="feed" id="feed">
+                <div class="empty" id="empty">
+                    <div class="empty-glyph">◈</div>
+                    <span>Awaiting intercept</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<script>
+    const PALETTE = [
+        "#00ffe5","#ff2d6e","#00ff88","#c77dff",
+        "#ffbe0b","#3a86ff","#ff6b35","#06d6a0",
+        "#ff99c8","#4cc9f0"
+    ];
+
+    const colorMap   = {};
+    const deviceData = {};
+    const cardEls    = {};
+    let   colorIdx   = 0;
+    let   activeFilter = null;
+    let   totalCount = 0;
+
+    function getColor(mac, name) {
+        if (!colorMap[mac])
+            colorMap[mac] = name === "Unknown" ? "#336644" : PALETTE[colorIdx++ % PALETTE.length];
+        return colorMap[mac];
+    }
+
+    function hex(c, a) {
+        return c + Math.round(a * 255).toString(16).padStart(2, "0");
+    }
+
+    function setFilter(mac) {
+        activeFilter = mac;
+        document.getElementById("all-btn").classList.toggle("active", mac === null);
+        Object.entries(cardEls).forEach(([m, el]) => {
+            el.classList.toggle("active", m === mac);
+            el.style.borderLeftColor = m === mac ? colorMap[m] : "transparent";
+        });
+        document.querySelectorAll(".row").forEach(r => {
+            r.classList.toggle("hidden", mac !== null && r.dataset.mac !== mac);
+        });
+    }
+
+    function upsertCard(mac, name, device, domain) {
+        const c = getColor(mac, name);
+        if (!deviceData[mac]) {
+            deviceData[mac] = { name, device, count: 0, history: new Array(14).fill(0) };
+            const sid = mac.replaceAll(':', '');
+            const card = document.createElement("div");
+            card.className = "dcard";
+            card.dataset.mac = mac;
+            card.onclick = () => setFilter(activeFilter === mac ? null : mac);
+            card.innerHTML = `
+                <div class="dcard-top">
+                    <span class="dcard-name" style="color:${c}">${name}</span>
+                    <span class="dcard-count" id="dc-${sid}">0</span>
+                </div>
+                <div class="dcard-device">${device}</div>
+                <div class="dcard-last" id="dl-${sid}">—</div>
+                <div class="dcard-bars" id="db-${sid}">
+                    ${Array(14).fill(0).map(() =>
+                        `<div class="dbar" style="height:1px;background:${hex(c,0.15)}"></div>`
+                    ).join('')}
+                </div>`;
+            document.getElementById("device-list").appendChild(card);
+            cardEls[mac] = card;
+            document.getElementById("target-count").textContent = Object.keys(cardEls).length;
+        }
+
+        const d = deviceData[mac];
+        d.count++;
+        d.history.push(1);
+        if (d.history.length > 14) d.history.shift();
+
+        const sid = mac.replaceAll(':', '');
+        document.getElementById(`dc-${sid}`).textContent = d.count;
+        document.getElementById(`dl-${sid}`).textContent = domain;
+
+        const bars = document.getElementById(`db-${sid}`).children;
+        const max  = Math.max(...d.history, 1);
+        d.history.forEach((v, i) => {
+            bars[i].style.height     = Math.max(1, Math.round((v / max) * 16)) + 'px';
+            bars[i].style.background = hex(c, v > 0 ? 0.8 : 0.1);
+            bars[i].style.boxShadow  = v > 0 ? `0 0 4px ${hex(c, 0.5)}` : 'none';
+        });
+
+        if (!d._tick) {
+            d._tick = setInterval(() => {
+                d.history.push(0);
+                if (d.history.length > 14) d.history.shift();
+            }, 4000);
+        }
+    }
+
+    function addRow(event, prepend = true) {
+        document.getElementById("empty")?.remove();
+
+        const mac = event.mac;
+        const c   = getColor(mac, event.name);
+
+        totalCount++;
+        document.getElementById("total-count").textContent = totalCount;
+        upsertCard(mac, event.name, event.device, event.domain);
+
+        const feed = document.getElementById("feed");
+        const row  = document.createElement("div");
+        row.className = "row";
+        row.dataset.mac = mac;
+
+        if (activeFilter && mac !== activeFilter) row.classList.add("hidden");
+
+        row.style.borderLeft = `2px solid ${c}`;
+        row.innerHTML = `
+            <span class="row-time">${event.time}</span>
+            <span class="row-domain">${event.domain}</span>
+            <span class="row-who">
+                <span class="row-who-info">
+                    <div class="row-who-name" style="color:${c}">${event.name}</div>
+                    <div class="row-who-device">${event.device}</div>
+                </span>
+                <span class="row-pip" style="background:${c};color:${c}"></span>
+            </span>`;
+
+        if (prepend) feed.insertBefore(row, feed.firstChild);
+        else         feed.appendChild(row);
+
+        while (feed.children.length > 300) feed.removeChild(feed.lastChild);
+    }
+
+    fetch("/history").then(r => r.json()).then(list => list.forEach(e => addRow(e, true)));
+    const src = new EventSource("/stream");
+    src.onmessage = e => addRow(JSON.parse(e.data), true);
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 from scapy.all import *
 from scapy.layers.l2 import Ether
+from datetime import datetime
+import events as ev
 
 
 NOISE = {
@@ -18,9 +20,15 @@ NOISE = {
     "msftncsi.com", "napps-1.com", "onetrust.com", "onetrust.io",
     "sc-cdn.net", "sc-gw.com", "snapkit.com",
     "ssl-images-amazon.com", "static.microsoft", "steamserver.net", "steamstatic.com",
-    "tiktokcdn-eu.com", "tiktokcdn-us.com", "tiktokv.com",
+    "tiktokcdn-eu.com", "tiktokcdn-us.com",
     "ttdns2.com", "vscode-cdn.net", "windowsupdate.com", "wpad.lan",
-    "ytimg.com"
+    "ytimg.com", "googlesyndication.com", "taboola.com", "resolver.arpa",
+    "cloudflare.com", "fastly-masque.net", "criteo.com",
+    "criteo.net", "ctolabperfstats.com",
+    "bytefcdn-oversea.com", "uctm.xyz", "userway.org",
+    "dxmdp.com", "dxmcdn.com", "google-analytics.com",
+    "outbrain.com", "clarity.ms", "zemanta.com",
+    "azureedge.net", "trafficmanager.net", "azure.com", "clickon.co.il"
 }
 
 def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac, blacklisted):
@@ -32,18 +40,24 @@ def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac, blacklisted)
 
     if packet[Ether].src in devices:
         if packet.haslayer(DNS) and packet.haslayer(UDP) and packet[UDP].dport == 53 and packet[DNS].qd:
-            domain = packet[DNS].qd.qname.decode()
+            domain = packet[DNS].qd.qname.decode(errors="ignore")
             parts = domain.rstrip(".").split(".")
             if len(parts) >= 3 and parts[-2] in {"co", "com", "net", "org", "gov", "edu", "ac"}:
                 root = ".".join(parts[-3:])
             else:
                 root = ".".join(parts[-2:])
-            if root not in NOISE:
+            if root not in NOISE and root:
                 info = devices[packet[Ether].src]
-                if info['name'] == "Unknown":
-                    print(f"Unknown ({packet[Ether].src}) -> {root}")
-                else:
-                    print(f"{info['name']} ({info['device']}) -> {root}")
+                name = "Unknown" if info['name'] == "Unknown" else info['name']
+                device = packet[Ether].src if info['name'] == "Unknown" else info['device']
+                print(f"{name} ({device}) -> {root}")
+                ev.publish({
+                    "name": name,
+                    "device": device,
+                    "mac": packet[Ether].src,
+                    "domain": root,
+                    "time": datetime.now().strftime("%H:%M:%S")
+                })
         packet[Ether].src = my_mac
         packet[Ether].dst = gateway_mac
         sendp(packet, verbose=0)
