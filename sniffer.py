@@ -1,6 +1,7 @@
 from scapy.all import *
 from scapy.layers.l2 import Ether
 
+
 NOISE = {
     "_tcp.lan", "a2z.com", "aaplimg.com", "adblockplus.org",
     "agkn.com", "akamai.net", "akamaiedge.net", "akadns.net",
@@ -13,7 +14,7 @@ NOISE = {
     "gcdn.co", "githubassets.com", "githubusercontent.com", "google.com",
     "googleadservices.com", "googleapis.com", "googletagmanager.com",
     "googleusercontent.com", "gstatic.com", "icloud.com", "local.",
-    "media-amazon.com", "microsoft.com", "mookie1.com", "msftconnecttest.com",
+    "media-amazon.com", "mookie1.com", "msftconnecttest.com",
     "msftncsi.com", "napps-1.com", "onetrust.com", "onetrust.io",
     "sc-cdn.net", "sc-gw.com", "snapkit.com",
     "ssl-images-amazon.com", "static.microsoft", "steamserver.net", "steamstatic.com",
@@ -22,8 +23,11 @@ NOISE = {
     "ytimg.com"
 }
 
-def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac):
+def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac, blacklisted):
     if not packet.haslayer(Ether):
+        return
+
+    if packet[Ether].src in blacklisted:
         return
 
     if packet[Ether].src in devices:
@@ -36,7 +40,10 @@ def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac):
                 root = ".".join(parts[-2:])
             if root not in NOISE:
                 info = devices[packet[Ether].src]
-                print(f"{info['name']} ({info['device']}) -> {root}")
+                if info['name'] == "Unknown":
+                    print(f"Unknown ({packet[Ether].src}) -> {root}")
+                else:
+                    print(f"{info['name']} ({info['device']}) -> {root}")
         packet[Ether].src = my_mac
         packet[Ether].dst = gateway_mac
         sendp(packet, verbose=0)
@@ -50,9 +57,9 @@ def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac):
             packet[Ether].dst = target_mac
             sendp(packet, verbose=0)
 
-def start_forwarding(devices, ip_to_mac, gateway_mac, my_mac):
+def start_forwarding(devices, ip_to_mac, gateway_mac, my_mac, blacklisted):
     sniff(
         filter="not arp",
-        prn=lambda pkt: forward_packet(pkt, devices, ip_to_mac, gateway_mac, my_mac),
+        prn=lambda pkt: forward_packet(pkt, devices, ip_to_mac, gateway_mac, my_mac, blacklisted),
         store=0
     )
