@@ -2,11 +2,24 @@ from scapy.all import *
 from scapy.layers.l2 import Ether
 
 NOISE = {
-    "wpad.lan", "msftconnecttest.com", "microsoft.com",
-    "windowsupdate.com", "steamserver.net", "napps-1.com",
-    "datadoghq.com", "onetrust.com", "onetrust.io",
-    "gstatic.com", "msftncsi.com", "local.", "icloud.com", "fbcdn.net"
-    , "cdninstagram.com "
+    "_tcp.lan", "a2z.com", "aaplimg.com", "adblockplus.org",
+    "agkn.com", "akamai.net", "akamaiedge.net", "akadns.net",
+    "amazon-adsystem.com", "ampproject.org", "app-analytics-services.com",
+    "app-measurement.com", "apple-dns.net", "apple.com", "appsflyersdk.com",
+    "amazonaws.com", "byteglb.com", "byteoversea.net",
+    "cdn77.org", "cdninstagram.com", "clinch.co", "cloudfront.net",
+    "datadoghq.com", "doubleclick.net", "exelator.com", "exp-tas.com",
+    "fastly-edge.com", "fastly.net", "fbcdn.net", "fbsbx.com",
+    "gcdn.co", "githubassets.com", "githubusercontent.com", "google.com",
+    "googleadservices.com", "googleapis.com", "googletagmanager.com",
+    "googleusercontent.com", "gstatic.com", "icloud.com", "local.",
+    "media-amazon.com", "microsoft.com", "mookie1.com", "msftconnecttest.com",
+    "msftncsi.com", "napps-1.com", "onetrust.com", "onetrust.io",
+    "sc-cdn.net", "sc-gw.com", "snapkit.com",
+    "ssl-images-amazon.com", "static.microsoft", "steamserver.net", "steamstatic.com",
+    "tiktokcdn-eu.com", "tiktokcdn-us.com", "tiktokv.com",
+    "ttdns2.com", "vscode-cdn.net", "windowsupdate.com", "wpad.lan",
+    "ytimg.com"
 }
 
 def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac):
@@ -16,7 +29,11 @@ def forward_packet(packet, devices, ip_to_mac, gateway_mac, my_mac):
     if packet[Ether].src in devices:
         if packet.haslayer(DNS) and packet.haslayer(UDP) and packet[UDP].dport == 53 and packet[DNS].qd:
             domain = packet[DNS].qd.qname.decode()
-            root = ".".join(domain.rstrip(".").split(".")[-2:])
+            parts = domain.rstrip(".").split(".")
+            if len(parts) >= 3 and parts[-2] in {"co", "com", "net", "org", "gov", "edu", "ac"}:
+                root = ".".join(parts[-3:])
+            else:
+                root = ".".join(parts[-2:])
             if root not in NOISE:
                 info = devices[packet[Ether].src]
                 print(f"{info['name']} ({info['device']}) -> {root}")

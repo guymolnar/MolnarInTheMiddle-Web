@@ -11,7 +11,10 @@ devices = {
 
 def main():
     gateway_ip = "192.168.10.1"
+    answered, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst="192.168.10.0/24"), timeout=2, verbose=0)
 
+    for sent, received in answered:
+        print(f"{received.psrc} → {received.hwsrc}")
     my_mac = get_if_hwaddr(conf.iface)
     gateway_mac = get_mac(gateway_ip)
     ip_to_mac = {info["ip"]: mac for mac, info in devices.items()}

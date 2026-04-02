@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls C:/Users/guymo/Documents/MITMSuite/*.py)"
-    ]
-  }
-}

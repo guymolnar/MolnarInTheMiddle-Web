@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="8a677712-c133-4c3f-90cf-84e4d302fe5a" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/MITMSuite.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MITMSuite.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sniffer.py" beforeDir="false" afterPath="$PROJECT_DIR$/sniffer.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
