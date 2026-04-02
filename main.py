@@ -4,19 +4,22 @@ from sniffer import *
 import threading
 import time
 
+#Configuration variables
 conf.iface = "Intel(R) Ethernet Connection (12) I219-V"
-
-# devices = {
-#     "28:d0:43:c7:bf:6c": {"name": "Guy", "device": "Laptop", "ip" : "192.168.10.133"},
-#     "72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
-# }
+gateway_ip = "192.168.10.1"
 
 devices = {
-    "58:ef:68:b4:ea:49": {"name": "Home TV", "device": "TV", "ip" : "10.100.102.12"},
-    "bc:9f:58:84:93:63": {"name": "Maya", "device": "iPhone", "ip" : "10.100.102.81"},
-    "bc:07:1d:cc:f1:69": {"name": "Lior", "device": "Google Pixel", "ip" : "10.100.102.76"},
-    "02:32:b8:8b:2c:b4": {"name": "Tali", "device": "iPhone", "ip" : "10.100.102.77"}
+    "28:d0:43:c7:bf:6c": {"name": "Guy", "device": "Laptop", "ip" : "192.168.10.133"},
+    "72:26:6a:4f:52:1a": {"name": "Guy", "device": "iPhone", "ip" : "192.168.10.218"},
 }
+
+
+# devices = {
+#     "58:ef:68:b4:ea:49": {"name": "Home TV", "device": "TV", "ip" : "10.100.102.12"},
+#     "bc:9f:58:84:93:63": {"name": "Maya", "device": "iPhone", "ip" : "10.100.102.81"},
+#     "bc:07:1d:cc:f1:69": {"name": "Lior", "device": "Google Pixel", "ip" : "10.100.102.76"},
+#     "02:32:b8:8b:2c:b4": {"name": "Tali", "device": "iPhone", "ip" : "10.100.102.77"}
+# }
 
 blacklisted = {
     "58:ef:68:b4:ea:49"
@@ -24,7 +27,7 @@ blacklisted = {
 
 def get_all_network_devices(my_mac, gateway_mac ):
     print("Getting all network devices...")
-    answered, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst="10.100.102.0/24"), timeout=2, verbose=0)
+    answered, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=".".join(gateway_ip.split(".")[:3]) + ".0/24"), timeout=2, verbose=0)
     for _, received in answered:
         mac = received.hwsrc
         ip = received.psrc
@@ -38,7 +41,6 @@ def get_all_network_devices(my_mac, gateway_mac ):
         print(f"{info['ip']} -> {mac} ({info['name']})")
 
 def main():
-    gateway_ip = "10.100.102.1"
     my_mac = get_if_hwaddr(conf.iface)
     gateway_mac = get_mac(gateway_ip)
 
